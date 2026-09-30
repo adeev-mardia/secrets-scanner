@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "secrets-scanner"
+version = "0.1.0"
+description = "A real, dependency-light secrets scanner: regex + entropy detection, git-history scanning, and a GitHub Action wrapper — no external service needed."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Adeev Mardia" }]
+keywords = ["security", "secrets", "scanner", "github-actions", "ci", "static-analysis"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Security",
+    "Intended Audience :: Developers",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=7.4"]
+
+[project.scripts]
+secrets-scanner = "secrets_scanner.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["secrets_scanner*"]
