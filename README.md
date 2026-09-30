@@ -42,32 +42,32 @@ Common flags:
 
 ### Real example output
 
-Running against this repo's own positive test fixture (`tests/fixtures/secrets_positive.txt`, which contains fake-but-realistic-shaped example secrets of every supported type):
+Running against this repo's own positive test fixture — `tests/fixtures/secrets_positive.txt` plus the AWS/Slack/Stripe/Twilio/SendGrid values from `tests/fixtures/secret_fragments.py` (see that file's docstring: those are split into fragments and reassembled only in memory, because GitHub's own push-protection secret scanning correctly blocks committing them as one contiguous string — a nice real-world confirmation that the formats this tool looks for are worth looking for):
 
 ```
-$ secrets-scanner scan tests/fixtures/secrets_positive.txt
-SEVERITY  RULE                           FILE                  LINE  MATCH      COMMIT
---------  -----------------------------  --------------------  ----  ---------  ------
-CRITICAL  aws_access_key_id              secrets_positive.txt  4     AKIA…OPEX
-CRITICAL  aws_secret_access_key          secrets_positive.txt  5     kL8n…JjKk
-CRITICAL  github_pat                     secrets_positive.txt  7     ghp_…gA9x
-CRITICAL  github_fine_grained_pat        secrets_positive.txt  8     gith…HJoK
-CRITICAL  stripe_live_secret_key         secrets_positive.txt  15    sk_l…9mVh
-CRITICAL  stripe_restricted_key          secrets_positive.txt  16    rk_l…9mVh
-CRITICAL  private_key_header             secrets_positive.txt  19    ----…----
-HIGH      slack_token                    secrets_positive.txt  10    xoxb…iwRx
-HIGH      slack_webhook                  secrets_positive.txt  11    http…iwRx
-HIGH      google_api_key                 secrets_positive.txt  13    AIza…psia
-HIGH      npm_token                      secrets_positive.txt  30    npm_…YFjS
-HIGH      twilio_api_key                 secrets_positive.txt  31    SK4f…78f6
-HIGH      sendgrid_api_key               secrets_positive.txt  32    SG.p…wixI
-HIGH      database_url_with_credentials  secrets_positive.txt  34    post…prod
-MEDIUM    jwt                            secrets_positive.txt  25    eyJh…PYaU
-MEDIUM    generic_api_key_assignment     secrets_positive.txt  27    Q9xR…zA9x
-MEDIUM    generic_password_assignment    secrets_positive.txt  28    tR0u…Long
-LOW       generic_high_entropy           secrets_positive.txt  20    MIIE…r2Wq
-LOW       generic_high_entropy           secrets_positive.txt  21    FpDD…mvbC
-LOW       generic_high_entropy           secrets_positive.txt  36    Zk4m…oI2k
+$ secrets-scanner scan combined_positive.txt
+SEVERITY  RULE                           FILE                   LINE  MATCH      COMMIT
+--------  -----------------------------  ---------------------  ----  ---------  ------
+CRITICAL  github_pat                     combined_positive.txt  13    ghp_…gA9x
+CRITICAL  github_fine_grained_pat        combined_positive.txt  14    gith…HJoK
+CRITICAL  private_key_header             combined_positive.txt  19    ----…----
+CRITICAL  aws_access_key_id              combined_positive.txt  36    AKIA…OPEX
+CRITICAL  aws_secret_access_key          combined_positive.txt  37    kL8n…JjKk
+CRITICAL  stripe_live_secret_key         combined_positive.txt  40    sk_l…9mVh
+CRITICAL  stripe_restricted_key          combined_positive.txt  41    rk_l…9mVh
+HIGH      google_api_key                 combined_positive.txt  16    AIza…psia
+HIGH      npm_token                      combined_positive.txt  30    npm_…YFjS
+HIGH      database_url_with_credentials  combined_positive.txt  32    post…prod
+HIGH      slack_token                    combined_positive.txt  38    xoxb…iwRx
+HIGH      slack_webhook                  combined_positive.txt  39    http…iwRx
+HIGH      twilio_api_key                 combined_positive.txt  42    SK4f…78f6
+HIGH      sendgrid_api_key               combined_positive.txt  43    SG.p…wixI
+MEDIUM    jwt                            combined_positive.txt  25    eyJh…PYaU
+MEDIUM    generic_api_key_assignment     combined_positive.txt  27    Q9xR…zA9x
+MEDIUM    generic_password_assignment    combined_positive.txt  28    tR0u…Long
+LOW       generic_high_entropy           combined_positive.txt  20    MIIE…r2Wq
+LOW       generic_high_entropy           combined_positive.txt  21    FpDD…mvbC
+LOW       generic_high_entropy           combined_positive.txt  34    Zk4m…oI2k
 
 20 finding(s).
 $ echo $?
