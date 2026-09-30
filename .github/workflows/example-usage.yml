@@ -1,0 +1,43 @@
+# Example: how a CONSUMING repository would use this action.
+# Copy this file into `.github/workflows/` in the repo you want scanned.
+name: Secrets scan (example usage)
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # needed for --diff / --git-history to see full history
+
+      # Fast path: only scan lines changed in this push/PR.
+      - name: Scan changed lines for secrets
+        uses: adeev-mardia/secrets-scanner@main
+        with:
+          mode: diff
+
+  # Optional: a slower, separate job that scans the *entire* git history
+  # (catches secrets committed and later removed), e.g. run weekly instead
+  # of on every push.
+  full-history-scan:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Scan full git history for secrets
+        uses: adeev-mardia/secrets-scanner@main
+        with:
+          mode: history
+          path: .
+          # Suppress known false positives committed to this repo.
+          allowlist: .secrets-allowlist.json

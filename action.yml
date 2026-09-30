@@ -1,0 +1,134 @@
+name: "Secrets Scanner"
+description: "Scan a repository (working tree, PR diff, or full git history) for leaked secrets and fail the build with inline GitHub Actions annotations. No external service, no API key required."
+author: "Adeev Mardia"
+branding:
+  icon: "shield"
+  color: "red"
+
+inputs:
+  mode:
+    description: >
+      What to scan: "diff" (only lines changed in this PR/push, fastest and
+      recommended for pull_request triggers), "path" (the full working tree
+      at the current checkout), or "history" (the entire reachable git
+      history — slower, but catches secrets that were committed and later
+      removed).
+    required: false
+    default: "diff"
+  path:
+    description: "Path to scan (used by mode=path and mode=history). Defaults to the repository root."
+    required: false
+    default: "."
+  base-ref:
+    description: "Base ref for mode=diff. Defaults to the PR base ref, or the previous commit on push."
+    required: false
+    default: ""
+  head-ref:
+    description: "Head ref for mode=diff. Defaults to the current checkout (HEAD)."
+    required: false
+    default: "HEAD"
+  allowlist:
+    description: "Path to a JSON allowlist/baseline file for suppressing known false positives."
+    required: false
+    default: ""
+  secretsignore:
+    description: "Path to a .secretsignore file."
+    required: false
+    default: ""
+  min-severity:
+    description: "Only fail on findings at or above this severity (critical, high, medium, low)."
+    required: false
+    default: ""
+  fail-on-findings:
+    description: "Whether to fail the step (exit 1) when secrets are found. Set to 'false' to only annotate."
+    required: false
+    default: "true"
+
+outputs:
+  findings-count:
+    description: "Number of findings reported by the scan."
+    value: ${{ steps.scan.outputs.findings-count }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.12"
+
+    - name: Install secrets-scanner
+      shell: bash
+      run: |
+        pip install "${{ github.action_path }}"
+
+    - name: Run scan
+      id: scan
+      shell: bash
+      run: |
+        set -uo pipefail
+
+        ARGS=(scan --format json)
+
+        if [ -n "${{ inputs.allowlist }}" ]; then
+          ARGS+=(--allowlist "${{ inputs.allowlist }}")
+        fi
+        if [ -n "${{ inputs.secretsignore }}" ]; then
+          ARGS+=(--secretsignore "${{ inputs.secretsignore }}")
+        fi
+        if [ -n "${{ inputs.min-severity }}" ]; then
+          ARGS+=(--min-severity "${{ inputs.min-severity }}")
+        fi
+
+        MODE="${{ inputs.mode }}"
+
+        if [ "$MODE" = "history" ]; then
+          ARGS+=(--git-history "${{ inputs.path }}")
+        elif [ "$MODE" = "diff" ]; then
+          BASE="${{ inputs.base-ref }}"
+          HEAD="${{ inputs.head-ref }}"
+          if [ -z "$BASE" ]; then
+            if [ -n "${{ github.event.pull_request.base.sha }}" ]; then
+              BASE="${{ github.event.pull_request.base.sha }}"
+            elif [ -n "${{ github.event.before }}" ] && [ "${{ github.event.before }}" != "0000000000000000000000000000000000000000" ]; then
+              BASE="${{ github.event.before }}"
+            else
+              BASE="HEAD~1"
+            fi
+          fi
+          ARGS+=("${{ inputs.path }}" --diff "${BASE}..${HEAD}")
+        else
+          ARGS+=("${{ inputs.path }}")
+        fi
+
+        echo "Running: secrets-scanner ${ARGS[*]}"
+        secrets-scanner "${ARGS[@]}" > scan-results.json
+
+        COUNT=$(python3 -c "import json;print(len(json.load(open('scan-results.json'))))" 2>/dev/null || echo 0)
+        echo "findings-count=${COUNT}" >> "$GITHUB_OUTPUT"
+
+        if [ "$COUNT" -gt 0 ]; then
+          echo "::group::secrets-scanner findings (${COUNT})"
+          cat scan-results.json
+          echo "::endgroup::"
+
+          # Emit real ::error file=...,line=...:: annotations per finding.
+          python3 - <<'PYEOF'
+import json
+
+with open("scan-results.json") as f:
+    findings = json.load(f)
+
+for finding in findings:
+    message = f"[{finding['severity'].upper()}] {finding['rule']}: possible secret detected ({finding['match']})"
+    message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    print(f"::error file={finding['file']},line={finding['line']},col={finding.get('column', 1)}::{message}")
+PYEOF
+        fi
+
+        if [ "$COUNT" -gt 0 ] && [ "${{ inputs.fail-on-findings }}" = "true" ]; then
+          echo "::error::secrets-scanner found ${COUNT} potential secret(s). See annotations above."
+          exit 1
+        fi
+
+        exit 0
